@@ -1,28 +1,13 @@
 ﻿// DirScanner.cpp : 定义 DLL 的导出函数。
 //
+#include <iostream>
+#include <thread>
+#include <fstream>
 
 #include "framework.h"
 #include "DirScanner.h"
 
-#include <iostream>
-#include <thread>
 
-
-// 这是导出变量的一个示例
-DIRSCANNER_API int nDirScanner = 0;
-
-// 这是导出函数的一个示例。
-DIRSCANNER_API int fnDirScanner(void)
-{
-	return 0;
-}
-
-// 这是已导出类的构造函数。
-CDirScanner::CDirScanner():m_totalSize(0)
-{
-	m_exitEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
-	return;
-}
 CDirScanner::CDirScanner(std::string root) :m_rootPath(root) , m_totalSize(0) {
 	m_exitEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
 }
@@ -37,11 +22,57 @@ void CDirScanner::UnRegistCallback(CallbackStage stage) {
 	}
 }
 
-void CDirScanner::SetRootPath(std::string root) {
-	m_rootPath = root;
+bool CDirScanner::StartScan() {
+	//启动主扫描线程
+	std::thread([this]() {
+		WIN32_FIND_DATAA finddata;
+		HANDLE file = FindFirstFileA(m_rootPath.c_str(), &finddata);
+
+		if (file == INVALID_HANDLE_VALUE) {
+			std::cout << "file invalid:" << m_rootPath << std::endl;
+			return false;
+		}
+		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {  //扫描目录
+			ScanDir(m_rootPath);
+		}
+		else {//扫描文件
+			ScanFile(m_rootPath, "");
+		}
+		FindClose(file);
+		return true;
+	}).detach();
+	return true;
 }
-std::string CDirScanner::GetRootPath() {
-	return m_rootPath;
+
+bool CDirScanner::StopScan() {
+	SetEvent(m_exitEvent);
+	return true;
+}
+
+bool CDirScanner::Break() {
+	return WaitForSingleObject(m_exitEvent, 0) == WAIT_OBJECT_0;
+}
+
+void CDirScanner::ReadFile(std::string path) {
+	std::fstream file;
+	file.open(path, std::ios::beg | std::ios::binary | std::ios::in);
+
+	if (file.is_open()) {
+		//获取文件长度
+		file.seekg(0, std::ios::end);
+		int len = file.tellg();
+		file.seekg(0, std::ios::beg);
+
+		char buf[1024] = { 0 };
+		while (!file.eof() && !Break()) {
+			file.read(buf, 1024);
+			//do something with buf...
+			//std::cout << buf;
+		}
+		if (Break()) {
+
+		}
+	}
 }
 
 bool CDirScanner::ScanFile(std::string path,std::string filename) {
@@ -66,6 +97,7 @@ bool CDirScanner::ScanFile(std::string path,std::string filename) {
 	}
 
 	//do scan
+	ReadFile(path + "\\" + finddata.cFileName);
 
 	//扫描文件后调用回调
 	AddTotalSize(info.fileSize);  //增加总大小
@@ -77,6 +109,8 @@ bool CDirScanner::ScanFile(std::string path,std::string filename) {
 	if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_FINISH)) {
 		m_callbacks[CALLBACK_STAGE_ON_ONE_FINISH](info);
 	}
+
+	FindClose(file);
 
 	return true;
 }
@@ -101,29 +135,32 @@ bool CDirScanner::ScanDir(std::string dir) {
 		m_callbacks[CALLBACK_STAGE_ON_ONE_BEGIN](info);
 	}
 
-	while (file != INVALID_HANDLE_VALUE) {
-		//std::cout << "scaning " << finddata.cFileName << std::endl;
+	while (file != INVALID_HANDLE_VALUE && !Break()) {
+		Sleep(100);
 		if (!strcmp(finddata.cFileName,".") || !strcmp(finddata.cFileName,"..")) {
-			std::cout << "jump . or .." << std::endl;
 			if (!FindNextFileA(file, &finddata)) {
 				break;
 			}
 			continue;
 		}
-
-		
 		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {  //扫描目录
-			//std::cout << "begin to scan dir :" << realPath << std::endl;
 			std::string realPath = dir + "\\" + std::string(finddata.cFileName);
-			ScanDir(realPath);
+			//启动扫描目录线程
+			std::thread([this, realPath]() {ScanDir(realPath); }).detach();
 		}
 		else {
-			//std::cout << "begin to scan file :" << realPath << std::endl;
-			ScanFile(dir, finddata.cFileName);
+			//启动扫描文件线程
+			std::string name = finddata.cFileName;
+			std::thread([this, dir,name](){ScanFile(dir, name); }).detach();
 		}
 		if (!FindNextFileA(file, &finddata)) {
 			break;
 		}
+	}
+	FindClose(file);
+
+	if (Break()) {
+		std::cout << "broken." << std::endl;
 	}
 
 	//扫描目录后
@@ -137,34 +174,6 @@ bool CDirScanner::ScanDir(std::string dir) {
 		m_callbacks[CALLBACK_STAGE_ON_ONE_FINISH](info);
 	}
 	return false;
-}
-
-bool CDirScanner::StartScan() {
-	std::thread([this]() {
-		WIN32_FIND_DATAA finddata;
-		HANDLE file = FindFirstFileA(m_rootPath.c_str(), &finddata);
-
-		if (file == INVALID_HANDLE_VALUE) {
-			std::cout << "file invalid:" << m_rootPath << std::endl;
-			return false;
-		}
-
-		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {  //扫描目录
-			std::cout << "begin to scan dir :" << m_rootPath << std::endl;
-			ScanDir(m_rootPath);
-		}
-		else {
-			std::cout << "begin to scan file :" << m_rootPath << std::endl;
-			ScanFile(m_rootPath,"");
-		}
-		FindClose(file);
-		return true;
-	}).detach();
-	return true;
-}
-
-bool CDirScanner::StopScan() {
-	return true;
 }
 
 void CDirScanner::AddTotalSize(uint64_t size) {

@@ -5,6 +5,10 @@
 #include "DirScanner.h"
 
 
+#include <Shlwapi.h>
+#pragma comment(lib,"shlwapi.lib")
+
+
 int OnBginScanOne(ScanInfo info) {
 	std::cout << "--- begin scan "<<info.fileAttr<<" : " << info.path << "\\" << info.filename
 		<< ",size : " << info.fileSize
@@ -32,12 +36,19 @@ int OnAllFinish(ScanInfo info) {
 
 int main()
 {
-	CDirScanner scanner("C:\\lx\\program\\c++\\ludashi\\DirScanner");
+	char buf[256] = { 0 };
+	GetModuleFileNameA(NULL, buf, 256);
+	PathRemoveFileSpecA(buf);
+
+	CDirScanner scanner(buf);
 	scanner.RegistCallback(CALLBACK_STAGE_ON_ONE_BEGIN, OnBginScanOne);
 	scanner.RegistCallback(CALLBACK_STAGE_ON_ONE_FINISH, OnFinishScanOne);
 	scanner.RegistCallback(CALLBACK_STAGE_ON_FINISH, OnAllFinish);
 
 	scanner.StartScan();
+
+	Sleep(500);
+	scanner.StopScan();
 
 	char c = getchar();
 

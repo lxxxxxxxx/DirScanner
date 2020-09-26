@@ -1,10 +1,4 @@
-﻿// 下列 ifdef 块是创建使从 DLL 导出更简单的
-// 宏的标准方法。此 DLL 中的所有文件都是用命令行上定义的 DIRSCANNER_EXPORTS
-// 符号编译的。在使用此 DLL 的
-// 任何项目上不应定义此符号。这样，源文件中包含此文件的任何其他项目都会将
-// DIRSCANNER_API 函数视为是从 DLL 导入的，而此 DLL 则将用此宏定义的
-// 符号视为是被导出的。
-#ifdef DIRSCANNER_EXPORTS
+﻿#ifdef DIRSCANNER_EXPORTS
 #define DIRSCANNER_API __declspec(dllexport)
 #else
 #define DIRSCANNER_API __declspec(dllimport)
@@ -32,41 +26,41 @@ enum CallbackStage {
 };
 
 typedef int(*CallbackFunc)(ScanInfo);
+typedef std::map<CallbackStage, CallbackFunc> CallbackMap;
 
 // 此类是从 dll 导出的
 class DIRSCANNER_API CDirScanner {
 public:
-	CDirScanner();
+	//带扫描路径的构造函数
 	CDirScanner(std::string root);
-
+	//注册回调：包括开始扫描文件，扫描文件完成，扫描所有文件完成
 	void RegistCallback(CallbackStage stage, CallbackFunc func);
+	//解注册回调
 	void UnRegistCallback(CallbackStage stage);
-
-	void SetRootPath(std::string root);
-	std::string GetRootPath();
-
-
-	bool ScanFile(std::string path, std::string filename);
-	bool ScanDir(std::string dir);
-
+	//开始扫描
 	bool StartScan();
+	//停止扫描
 	bool StopScan();
-
-	void AddTotalSize(uint64_t size);
-	uint64_t GetTotalSize();
-
-	
 
 
 private:
+	//停止扫描循环
+	bool Break();
+	//读取文件：核心处理函数
+	void ReadFile(std::string path);
+	//扫描文件
+	bool ScanFile(std::string path, std::string filename);
+	//扫描目录
+	bool ScanDir(std::string dir);
+	//累计文件大小
+	void AddTotalSize(uint64_t size);
+	//获取累计大小
+	uint64_t GetTotalSize();
+
+private:
 	std::string m_rootPath;
-	std::map<CallbackStage, CallbackFunc> m_callbacks;
-	HANDLE m_exitEvent;
-
-	uint64_t m_totalSize;
-	std::mutex m_sizeMutex;
+	CallbackMap m_callbacks;
+	HANDLE      m_exitEvent;
+	uint64_t    m_totalSize;
+	std::mutex  m_sizeMutex;
 };
-
-extern DIRSCANNER_API int nDirScanner;
-
-DIRSCANNER_API int fnDirScanner(void);
