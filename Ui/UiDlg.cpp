@@ -2,7 +2,6 @@
 // UiDlg.cpp: 实现文件
 //
 
-#include "pch.h"
 #include "framework.h"
 #include "Ui.h"
 #include "UiDlg.h"
@@ -54,17 +53,24 @@ CUiDlg::CUiDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_UI_DIALOG, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	m_dirScanner.Attach(this);
 }
 
 void CUiDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_RICHEDIT22, m_richedit);
 }
 
 BEGIN_MESSAGE_MAP(CUiDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_BUTTON2, &CUiDlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON2, &CUiDlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON3, &CUiDlg::OnBnClickedButton3)
+	ON_EN_CHANGE(IDC_MFCEDITBROWSE2, &CUiDlg::OnEnChangeMfceditbrowse2)
+	ON_BN_CLICKED(IDC_BUTTON4, &CUiDlg::OnBnClickedButton4)
 END_MESSAGE_MAP()
 
 
@@ -153,3 +159,74 @@ HCURSOR CUiDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+void CUiDlg::OnBnClickedButton2()
+{
+	if (m_dirScanner.GetRootPath().empty()) {
+		return;
+	}
+
+	m_dirScanner.StartScan();
+}
+
+
+void CUiDlg::OnBnClickedButton3()
+{
+	m_dirScanner.StopScan();
+}
+
+
+void CUiDlg::OnEnChangeMfceditbrowse2()
+{
+	// TODO:  如果该控件是 RICHEDIT 控件，它将不
+	// 发送此通知，除非重写 CDialogEx::OnInitDialog()
+	// 函数并调用 CRichEditCtrl().SetEventMask()，
+	// 同时将 ENM_CHANGE 标志“或”运算到掩码中。
+
+	// TODO:  在此添加控件通知处理程序代码
+
+	CString selectedPath;
+
+	GetDlgItemText(IDC_MFCEDITBROWSE2, selectedPath);
+	std::string path = CT2A(selectedPath.GetBuffer());
+	m_dirScanner.SetRootPath(path);
+}
+
+
+void CUiDlg::OnScanOneStart(ScanInfo info) {
+	std::string msg = "scanning " + info.fileAttr + " " + info.path + "\\" + info.filename;
+	msg += ",size : "+std::to_string(info.fileSize);
+	msg += ", now total size is " + std::to_string(info.totalSize) + "\n";
+
+	CString str(msg.c_str());
+	m_richedit.SetSel(-1, -1);
+	m_richedit.ReplaceSel(str);
+	m_richedit.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
+}
+
+void CUiDlg::OnScanOneFinish(ScanInfo info) {
+	std::string msg = "finish scan " + info.fileAttr + " " + info.path + "\\" + info.filename;
+	msg += ",size : " + std::to_string(info.fileSize);
+	msg += ", now total size is " + std::to_string(info.totalSize) + "\n";
+
+	CString str(msg.c_str());
+	m_richedit.SetSel(-1, -1);
+	m_richedit.ReplaceSel(str);
+	m_richedit.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
+}
+
+void CUiDlg::OnScanAllFinish(ScanInfo info) {
+	std::string msg = "finish scan all file, total size is " + std::to_string(info.totalSize) + "\n";
+
+	CString str(msg.c_str());
+	m_richedit.SetSel(-1, -1);
+	m_richedit.ReplaceSel(str);
+	m_richedit.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
+}
+
+void CUiDlg::OnBnClickedButton4()
+{
+	m_richedit.SetFocus();
+	m_richedit.SetSel(0, -1);
+	m_richedit.Clear();
+}

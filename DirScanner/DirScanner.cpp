@@ -7,22 +7,49 @@
 #include "framework.h"
 #include "DirScanner.h"
 
+CDirScanner::CDirScanner() :m_totalSize(0) {
+	m_exitEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+}
 
 CDirScanner::CDirScanner(std::string root) :m_rootPath(root) , m_totalSize(0) {
 	m_exitEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
 }
 
-void CDirScanner::RegistCallback(CallbackStage stage, CallbackFunc func) {
-	m_callbacks[stage] = func;
+void CDirScanner::SetRootPath(std::string path) {
+	m_rootPath = path;
 }
 
-void CDirScanner::UnRegistCallback(CallbackStage stage) {
-	if (m_callbacks.count(stage)) {
-		m_callbacks.erase(stage);
+std::string CDirScanner::GetRootPath() {
+	return m_rootPath;
+}
+
+//void CDirScanner::RegistCallback(CallbackStage stage, CallbackFunc func) {
+//	m_callbacks[stage] = func;
+//}
+//
+//void CDirScanner::UnRegistCallback(CallbackStage stage) {
+//	if (m_callbacks.count(stage)) {
+//		m_callbacks.erase(stage);
+//	}
+//}
+
+void CDirScanner::Attach(SubscriberBase *subscriber) {
+	m_subscriber.push_back(subscriber);
+}
+
+void CDirScanner::UnAttach(SubscriberBase *subscriber) {
+	int i = 0;
+	for (; i < m_subscriber.size(); i++) {
+		if (m_subscriber[i] == subscriber) {
+			break;
+		}
 	}
+	m_subscriber.erase(m_subscriber.begin() + i);
+
 }
 
 bool CDirScanner::StartScan() {
+	ResetEvent(m_exitEvent);
 	//启动主扫描线程
 	std::thread([this]() {
 		WIN32_FIND_DATAA finddata;
@@ -39,6 +66,18 @@ bool CDirScanner::StartScan() {
 			ScanFile(m_rootPath, "");
 		}
 		FindClose(file);
+
+		Sleep(500);
+		ScanInfo info;
+		info.totalSize = GetTotalSize();
+		Notify(CALLBACK_STAGE_ON_FINISH, info);
+
+
+		//if (m_callbacks.count(CALLBACK_STAGE_ON_FINISH)) {
+		//	ScanInfo info;
+		//	info.totalSize = GetTotalSize();
+		//	m_callbacks[CALLBACK_STAGE_ON_FINISH](info);
+		//}
 		return true;
 	}).detach();
 	return true;
@@ -92,9 +131,12 @@ bool CDirScanner::ScanFile(std::string path,std::string filename) {
 	info.filename = std::string(finddata.cFileName);
 	info.fileSize = (finddata.nFileSizeHigh * (MAXDWORD + 1)) + finddata.nFileSizeLow;
 	info.totalSize = GetTotalSize();
-	if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_BEGIN)) {
-		m_callbacks[CALLBACK_STAGE_ON_ONE_BEGIN](info);
-	}
+
+	Notify(CALLBACK_STAGE_ON_ONE_BEGIN, info);
+
+	//if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_BEGIN)) {
+	//	m_callbacks[CALLBACK_STAGE_ON_ONE_BEGIN](info);
+	//}
 
 	//do scan
 	ReadFile(path + "\\" + finddata.cFileName);
@@ -106,9 +148,12 @@ bool CDirScanner::ScanFile(std::string path,std::string filename) {
 	info.filename = std::string(finddata.cFileName);
 	info.fileSize = (finddata.nFileSizeHigh * (MAXDWORD + 1)) + finddata.nFileSizeLow;
 	info.totalSize = GetTotalSize();
-	if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_FINISH)) {
-		m_callbacks[CALLBACK_STAGE_ON_ONE_FINISH](info);
-	}
+
+	Notify(CALLBACK_STAGE_ON_ONE_FINISH, info);
+
+	//if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_FINISH)) {
+	//	m_callbacks[CALLBACK_STAGE_ON_ONE_FINISH](info);
+	//}
 
 	FindClose(file);
 
@@ -131,12 +176,14 @@ bool CDirScanner::ScanDir(std::string dir) {
 	info.filename = std::string(finddata.cFileName);
 	info.fileSize = (finddata.nFileSizeHigh * (MAXDWORD + 1)) + finddata.nFileSizeLow;
 	info.totalSize = GetTotalSize();
-	if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_BEGIN)) {
-		m_callbacks[CALLBACK_STAGE_ON_ONE_BEGIN](info);
-	}
+
+	Notify(CALLBACK_STAGE_ON_ONE_BEGIN, info);
+
+	//if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_BEGIN)) {
+	//	m_callbacks[CALLBACK_STAGE_ON_ONE_BEGIN](info);
+	//}
 
 	while (file != INVALID_HANDLE_VALUE && !Break()) {
-		Sleep(100);
 		if (!strcmp(finddata.cFileName,".") || !strcmp(finddata.cFileName,"..")) {
 			if (!FindNextFileA(file, &finddata)) {
 				break;
@@ -144,8 +191,8 @@ bool CDirScanner::ScanDir(std::string dir) {
 			continue;
 		}
 		if (finddata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {  //扫描目录
-			std::string realPath = dir + "\\" + std::string(finddata.cFileName);
 			//启动扫描目录线程
+			std::string realPath = dir + "\\" + std::string(finddata.cFileName);
 			std::thread([this, realPath]() {ScanDir(realPath); }).detach();
 		}
 		else {
@@ -170,9 +217,12 @@ bool CDirScanner::ScanDir(std::string dir) {
 	info.filename = std::string(finddata.cFileName);
 	info.fileSize = (finddata.nFileSizeHigh * (MAXDWORD + 1)) + finddata.nFileSizeLow;
 	info.totalSize = GetTotalSize();
-	if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_FINISH)) {
-		m_callbacks[CALLBACK_STAGE_ON_ONE_FINISH](info);
-	}
+
+	Notify(CALLBACK_STAGE_ON_ONE_FINISH, info);
+
+	//if (m_callbacks.count(CALLBACK_STAGE_ON_ONE_FINISH)) {
+	//	m_callbacks[CALLBACK_STAGE_ON_ONE_FINISH](info);
+	//}
 	return false;
 }
 
@@ -184,4 +234,30 @@ void CDirScanner::AddTotalSize(uint64_t size) {
 uint64_t CDirScanner::GetTotalSize() {
 	std::lock_guard<std::mutex> autolock(m_sizeMutex);
 	return m_totalSize;
+}
+
+//通知订阅制
+void CDirScanner::Notify(CallbackStage stage, ScanInfo info) {
+	switch (stage) {
+	case CALLBACK_STAGE_ON_ONE_BEGIN: {
+		for (auto it : m_subscriber) {
+			it->OnScanOneStart(info);
+		}
+		break;
+	}
+	case CALLBACK_STAGE_ON_ONE_FINISH: {
+		for (auto it : m_subscriber) {
+			it->OnScanOneFinish(info);
+		}
+		break;
+	}
+	case CALLBACK_STAGE_ON_FINISH: {
+		for (auto it : m_subscriber) {
+			it->OnScanAllFinish(info);
+		}
+		break;
+	}
+	default:
+		break;
+	}
 }

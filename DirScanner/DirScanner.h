@@ -5,43 +5,38 @@
 #endif
 
 #include <Windows.h>
-#include <string>
-#include <map>
+//#include <map>
+#include <vector>
 #include <mutex>
-
-typedef struct _ScanInfo {
-	std::string fileAttr; // "file" or "dir"
-	std::string path;
-	std::string filename;
-	uint64_t fileSize;
-	uint64_t totalSize;
-	_ScanInfo(): fileSize(0), totalSize(0){
-	}
-}ScanInfo;
-
-enum CallbackStage {
-	CALLBACK_STAGE_ON_ONE_BEGIN,   //开始扫描文件
-	CALLBACK_STAGE_ON_ONE_FINISH,  //扫描文件结束
-	CALLBACK_STAGE_ON_FINISH,      //所有文件扫描结束
-};
+#include "NotifyInterface.h"
 
 typedef int(*CallbackFunc)(ScanInfo);
-typedef std::map<CallbackStage, CallbackFunc> CallbackMap;
+//typedef std::map<CallbackStage, CallbackFunc> CallbackMap;
 
 // 此类是从 dll 导出的
 class DIRSCANNER_API CDirScanner {
 public:
+	CDirScanner();
 	//带扫描路径的构造函数
 	CDirScanner(std::string root);
-	//注册回调：包括开始扫描文件，扫描文件完成，扫描所有文件完成
-	void RegistCallback(CallbackStage stage, CallbackFunc func);
-	//解注册回调
-	void UnRegistCallback(CallbackStage stage);
+	//设置扫描路径
+	void SetRootPath(std::string path);
+	//获取扫描路径
+	std::string GetRootPath();
+
+	////注册回调：包括开始扫描文件，扫描文件完成，扫描所有文件完成
+	//void RegistCallback(CallbackStage stage, CallbackFunc func);
+	////解注册回调
+	//void UnRegistCallback(CallbackStage stage);
+
+	//注册订阅者
+	void Attach(SubscriberBase *subscriber);
+	//解注册订阅者
+	void UnAttach(SubscriberBase *subscriber);
 	//开始扫描
 	bool StartScan();
 	//停止扫描
 	bool StopScan();
-
 
 private:
 	//停止扫描循环
@@ -57,9 +52,13 @@ private:
 	//获取累计大小
 	uint64_t GetTotalSize();
 
+	//通知订阅制
+	void Notify(CallbackStage stage, ScanInfo info);
+
 private:
 	std::string m_rootPath;
-	CallbackMap m_callbacks;
+	//CallbackMap m_callbacks;
+	std::vector<SubscriberBase*> m_subscriber;
 	HANDLE      m_exitEvent;
 	uint64_t    m_totalSize;
 	std::mutex  m_sizeMutex;

@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.28307.1231
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ui", "Ui\Ui.vcxproj", "{E56B4D6F-67EC-4FBA-9D37-10547ECDD348}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9B9068A9-D8EC-41FD-A9B0-DF424FF5A08E} = {9B9068A9-D8EC-41FD-A9B0-DF424FF5A08E}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ScanTest", "ScanTest\ScanTest.vcxproj", "{E2CE6D7A-D93F-468F-860B-241AFB8F41C1}"
 	ProjectSection(ProjectDependencies) = postProject

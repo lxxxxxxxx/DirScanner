@@ -8,29 +8,52 @@
 #include <Shlwapi.h>
 #pragma comment(lib,"shlwapi.lib")
 
+class TestSubscirber final:public SubscriberBase {
+public:
+	TestSubscirber(){}
+	~TestSubscirber(){}
 
-int OnBginScanOne(ScanInfo info) {
-	std::cout << "--- begin scan "<<info.fileAttr<<" : " << info.path << "\\" << info.filename
-		<< ",size : " << info.fileSize
-		<< ",attr : " << info.fileAttr
-		<< ",total : " << info.totalSize << std::endl;
+	void OnScanOneStart(ScanInfo info) {
+		std::cout << "--- begin scan " << info.fileAttr << " : " << info.path << "\\" << info.filename
+			<< ",size : " << info.fileSize
+			<< ",attr : " << info.fileAttr
+			<< ",total : " << info.totalSize << std::endl;
+	}
+	void OnScanOneFinish(ScanInfo info) {
+		std::cout << "   --- finish scan " << info.fileAttr << " : " << info.path << "\\" << info.filename
+			<< ",size : " << info.fileSize
+			<< ",attr : " << info.fileAttr
+			<< ",total : " << info.totalSize << std::endl;
+	}
+	void OnScanAllFinish(ScanInfo info) {
+		std::cout << "+++ scan all file finished,total size : " << info.totalSize << std::endl;
+	}
 
-	return 0;
-}
+};
 
-int OnFinishScanOne(ScanInfo info) {
-	std::cout << "   --- finish scan " << info.fileAttr << " : " << info.path << "\\" << info.filename
-		<< ",size : " << info.fileSize
-		<< ",attr : " << info.fileAttr
-		<< ",total : " << info.totalSize << std::endl;
 
-	return 0;
-}
-
-int OnAllFinish(ScanInfo info) {
-	std::cout << "+++ scan all file finished,total size : " << info.totalSize << std::endl;
-	return 0;
-}
+//int OnBginScanOne(ScanInfo info) {
+//	std::cout << "--- begin scan "<<info.fileAttr<<" : " << info.path << "\\" << info.filename
+//		<< ",size : " << info.fileSize
+//		<< ",attr : " << info.fileAttr
+//		<< ",total : " << info.totalSize << std::endl;
+//
+//	return 0;
+//}
+//
+//int OnFinishScanOne(ScanInfo info) {
+//	std::cout << "   --- finish scan " << info.fileAttr << " : " << info.path << "\\" << info.filename
+//		<< ",size : " << info.fileSize
+//		<< ",attr : " << info.fileAttr
+//		<< ",total : " << info.totalSize << std::endl;
+//
+//	return 0;
+//}
+//
+//int OnAllFinish(ScanInfo info) {
+//	std::cout << "+++ scan all file finished,total size : " << info.totalSize << std::endl;
+//	return 0;
+//}
 
 
 
@@ -39,16 +62,20 @@ int main()
 	char buf[256] = { 0 };
 	GetModuleFileNameA(NULL, buf, 256);
 	PathRemoveFileSpecA(buf);
+	//PathRemoveFileSpecA(buf);
+	//PathRemoveFileSpecA(buf);
 
+	TestSubscirber tester;
 	CDirScanner scanner(buf);
-	scanner.RegistCallback(CALLBACK_STAGE_ON_ONE_BEGIN, OnBginScanOne);
-	scanner.RegistCallback(CALLBACK_STAGE_ON_ONE_FINISH, OnFinishScanOne);
-	scanner.RegistCallback(CALLBACK_STAGE_ON_FINISH, OnAllFinish);
+	//scanner.RegistCallback(CALLBACK_STAGE_ON_ONE_BEGIN, OnBginScanOne);
+	//scanner.RegistCallback(CALLBACK_STAGE_ON_ONE_FINISH, OnFinishScanOne);
+	//scanner.RegistCallback(CALLBACK_STAGE_ON_FINISH, OnAllFinish);
+	scanner.Attach(&tester);
 
 	scanner.StartScan();
 
-	Sleep(500);
-	scanner.StopScan();
+	//Sleep(500);
+	//scanner.StopScan();
 
 	char c = getchar();
 

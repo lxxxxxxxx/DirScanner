@@ -24,6 +24,12 @@
     <ClInclude Include="DirScanner.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="NotifyInterface.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DirScanner.cpp">
